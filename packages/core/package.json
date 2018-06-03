@@ -1,0 +1,9 @@
+{
+  "name": "@nosea/core",
+  "version": "0.2.4",
+  "description": "Nosea core.",
+  "main": "./lib/index.js",
+  "author": "Jiacheng ZHANG<os@kt.je>",
+  "homepage": "https://nosea.io/",
+  "license": "LGPLv2"
+}
