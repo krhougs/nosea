@@ -1,9 +1,16 @@
 {
   "name": "@nosea/core",
-  "version": "0.2.4",
-  "description": "Nosea core.",
+  "version": "1.0.2",
+  "description": "一个微信小程序框架。",
   "main": "./lib/index.js",
   "author": "Jiacheng ZHANG<os@kt.je>",
-  "homepage": "https://nosea.io/",
-  "license": "LGPLv2"
+  "homepage": "https://kt.je/nosea",
+  "repository": "oranzhang/nosea",
+  "license": "MIT",
+  "dependencies": {
+    "hable": "^0.0.7"
+  },
+  "devDependencies": {
+    "@babel/runtime": "^7.3.1"
+  }
 }

@@ -1,98 +1,66 @@
-import { MINA_PAGE_LIFECYCLES, MINA_APP_LIFECYCLES } from './constants'
+import {
+  S_PLUGINS,
+  E_INVALID_CONTEXT
+} from './constants'
 
-function commitHooks (scope, hookname, noseaPage) {
-  // thisArg should be noseaApp
-  const pluginsInstances = this.plugins.instances
-  return Promise.all(
-    Object.values(pluginsInstances).map(i => {
-      if (i.hooks && i.hooks[scope] && i.hooks[scope][hookname]) {
-        return i.hooks[scope][hookname](this, noseaPage)
-      } else {
-        return Promise.resolve()
+function initPlugins (context) {
+  if (context.constructor.isNoseaApp) {
+    return hookApp(context)
+  }
+  if (context.constructor.isNoseaPage) {
+    return hookPage(context)
+  }
+  if (context.constructor.isNoseaPageProxy) {
+    return hookPageProxy(context)
+  }
+  throw E_INVALID_CONTEXT
+}
+
+function hookApp (app) {
+  if (!app.constructor.isNoseaApp) {
+    throw E_INVALID_CONTEXT
+  }
+  app[S_PLUGINS] = app.constructor.plugins
+    .map(p => {
+      if (p.installApp) {
+        p::p.installApp(app)
       }
+      return p
     })
-  )
 }
 
-function initPlugins (noseaApp) {
-  const ret = {
-    commitAppHook (hookname) {
-      if (MINA_APP_LIFECYCLES.indexOf(hookname) > -1) {
-        return commitHooks.bind(noseaApp, 'app', hookname)()
-      }
-      throw new Error('Invalid lifecycle hook!')
-    },
-    commitPageHook (hookname, noseaPage) {
-      if (MINA_PAGE_LIFECYCLES.indexOf(hookname) > -1) {
-        return commitHooks.bind(noseaApp, 'page', hookname, noseaPage)()
-      }
-      throw new Error('Invalid lifecycle hook!')
-    },
-    commitCustomHook (scope, hookname) {
-      return commitHooks.bind(noseaApp, scope, hookname)()
-    },
-    commitPageShareAppMessage (wxOptions, _this) {
-      const plugins = Object.values(noseaApp.plugins.instances)
-        .filter(i => i.hooks && i.hooks['page'] && i.hooks['page']['onShareAppMessage'])
-      if (!plugins.length) { return undefined }
-      if (!plugins.length > 1) { console.warn('More than 1 plugin has hooked onShareAppMessage. Only 1 plugin\'s hook could be invoked due to WeChat\'s limit.') }
-      return plugins[0].hooks['page']['onShareAppMessage'](noseaApp, _this, wxOptions)
-    }
+function hookPage (page) {
+  if (!page.constructor.isNoseaPage) {
+    throw E_INVALID_CONTEXT
   }
-
-  let pluginsInstances = noseaApp.constructor.plugins
-
-  if (!(noseaApp && noseaApp.isNoseaApp)) { throw Error('Not a NoseaApp or the NoseaApp not initialized!') }
-  if (!(pluginsInstances && Object.keys(pluginsInstances).length)) { return ret }
-
-  pluginsInstances = Object.assign({}, pluginsInstances)
-
-  const retAttrs = {
-    instances: {
-      get () { return pluginsInstances }
-    },
-    methods: {
-      get () {
-        return Object.assign(
-          {},
-          ...Object.values(pluginsInstances).map(p => p.methods || {})
-        )
+  wx.$app.constructor.plugins
+    .forEach(p => {
+      if (p.installPage) {
+        p::p.installPage(page)
       }
-    },
-    events: {
-      get () {
-        return Object.values(pluginsInstances).map(p => p.events || [])
-      }
-    }
-  }
-
-  Object.defineProperties(ret, retAttrs)
-  return ret
+      return p
+    })
 }
 
-const rawOptionsSymbol = Symbol('rawOptions')
-const eventsSymbol = Symbol('events')
-const methodsSymbol = Symbol('methods')
-
-class NoseaPlugin {
-  /**
-    events, Array[String]
-    methods, Object{Function}
-  */
-
-  constructor (options) {
-    this[rawOptionsSymbol] = options
-    this[eventsSymbol] = this.constructor.events || []
-    this[methodsSymbol] = this.constructor.methods || {}
+function hookPageProxy (proxy) {
+  if (!proxy.constructor.isNoseaPageProxy) {
+    throw E_INVALID_CONTEXT
   }
-
-  get _events () { return [].concat(this[eventsSymbol]) }
-  get events () { return this._events }
-
-  get _methods () { return Object.assign({}, this[methodsSymbol]) }
-  get methods () { return this._methods }
-
-  get rawOptions () { return Object.assign({}, this[rawOptionsSymbol]) }
+  wx.$app.constructor.plugins
+    .forEach(p => {
+      if (p.installPageProxy) {
+        p::p.installPageProxy(proxy)
+      }
+      return p
+    })
 }
 
-export { NoseaPlugin, initPlugins }
+class NoseaPluginBase {
+  static isNoseaPlugin = true
+}
+
+export {
+  NoseaPluginBase,
+  NoseaPluginBase as NoseaPlugin,
+  initPlugins
+}

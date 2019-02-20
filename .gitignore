@@ -8,3 +8,4 @@ yarn-error.log*
 .vscode
 .vscode*
 errors.log
+.cache

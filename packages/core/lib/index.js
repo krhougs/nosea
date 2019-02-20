@@ -1,9 +1,11 @@
 import { NoseaApp } from './app'
-import { NoseaPage } from './page'
-import { NoseaPlugin } from './plugin'
+import { NoseaPage, useMixinDecorator } from './page'
+import { NoseaPluginBase } from './plugin'
 
 export {
   NoseaApp,
   NoseaPage,
-  NoseaPlugin
+  NoseaPluginBase,
+  NoseaPluginBase as NoseaPlugin,
+  useMixinDecorator as useMixin
 }

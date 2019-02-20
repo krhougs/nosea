@@ -1,130 +1,222 @@
-import { MINA_PAGE_LIFECYCLES, noop } from './constants'
+import {
+  S_MINA_APP,
+  S_NOSEA_APP,
+  S_MINA_PAGE,
+  S_NOSEA_PAGE,
+  S_LOAD_OPTIONS,
+  S_PAGE_PROXIES
+} from './constants'
 
-const noseaAppSymbol = Symbol('minaApp')
-const minaPageSymbol = Symbol('minaPage')
-const minaPageConstructSymbol = Symbol('minaPageConstruct')
+import {
+  noseaPageDefaultLifecyclePromises,
+  getNoseaPageHooks,
+  getMinaPageLifecycles
+} from './lifecycle'
 
-class NoseaPage {
-  /*
-    data, Object{any}
-    methods, Object{Function}, Array[Object]
-  */
+import { initPlugins } from './plugin'
 
-  constructor () {
-    this[noseaAppSymbol] = wx.$app
-    this[minaPageConstructSymbol] = null
-    this[minaPageSymbol] = null
-  }
+class PageProxy {
+  static isNoseaPageProxy = true
 
-  get $noseaApp () { return this[noseaAppSymbol] }
+  constructor (noseaPage, mixin) {
+    this[S_NOSEA_PAGE] = noseaPage
+    this.name = mixin.name || null
+    this.mMethods = mixin.methods
+    this.mData = mixin.data
 
-  get $minaApp () { return this[noseaAppSymbol].$minaApp }
+    this.initProxy()
 
-  get $minaPage () { return this[minaPageSymbol] }
-
-  get minaPageStruct () {
-    return this[minaPageConstructSymbol]
-      ? Object.assign({}, this[minaPageConstructSymbol]) : null
-  }
-
-  get isConstructed () { return !!this[minaPageConstructSymbol] }
-
-  get isNoseaPage () { return true }
-
-  get data () { return this.constructor.data || {} }
-
-  get methods () {
-    const raw = this.constructor.methods
-    if (typeof raw === 'object') {
-      if (raw.constructor.name === 'Array') {
-        return raw.reduce((acc, current) => Object.assign(acc, current), {})
-      }
-      return Object.assign({}, raw)
+    if (typeof mixin.onMount === 'function') {
+      this::mixin.onMount(noseaPage)
     }
-    return {}
+
+    initPlugins(this)
   }
 
-  construct () {
-    if (this.isConstructed) { return this.minaPageStruct }
+  get $minaApp () { return this[S_NOSEA_PAGE][S_MINA_APP] }
+  get $noseaApp () { return this[S_NOSEA_PAGE][S_NOSEA_APP] }
+  get $minaPage () { return this[S_NOSEA_PAGE][S_MINA_PAGE] }
+  get $noseaPage () { return this[S_NOSEA_PAGE] }
 
-    const _this = this
+  get loadOptions () { return this[S_NOSEA_PAGE][S_LOAD_OPTIONS] }
+
+  get data () { return this.$minaPage.data }
+
+  setData (data) {
+    let ret = data
+    if (this.name) {
+      ret = {}
+      for (const key in data) {
+        ret[`${this.name}.${key}`] = data[key]
+      }
+    }
+    return this._setData(ret)
+  }
+
+  _setData (data) {
+    return new Promise((resolve, reject) => {
+      this.$minaPage.setData(data, () => {
+        resolve()
+      })
+    })
+  }
+
+  getMinaPageMethods () {
     const ret = {}
+    for (const key in this.mMethods) {
+      const keyName = this.name
+        ? `${this.name}.${key}`
+        : key
+      ret[keyName] = this.proxy::this.mMethods[key]
+    }
+    return ret
+  }
 
-    ret['data'] = Object.assign({}, this.$noseaApp.pageData, this.data)
+  getMinaPageData () {
+    return this.name
+      ? { [this.name]: this.mData }
+      : this.mData
+  }
 
-    Object.assign(
-      ret,
-      this.$noseaApp.plugins.methods,
-      this.$noseaApp.methods,
-      this.methods
-    )
+  getMethod (name) {
+    let ret
 
-    ret['onLoad'] = function (options) {
-      Object.defineProperties(this, {
+    if (this.name) {
+      ret = this.mMethods[name]
+        ? this.$minaPage[`${this.name}.${name}`]
+        : this.$minaPage[name]
+    } else {
+      ret = this.$minaPage[name]
+    }
+
+    return ret || undefined
+  }
+
+  callMethod (name, ...args) {
+    return this.getMethod(name)(...args)
+  }
+
+  initProxy () {
+    const target = {}
+    const props = {}
+
+    const thisNames = [
+      ...Object.getOwnPropertyNames(this.constructor.prototype),
+      ...Object.getOwnPropertyNames(this)
+    ]
+    const pageNames = [
+      ...Object.getOwnPropertyNames(this.$noseaPage.constructor.prototype),
+      ...Object.getOwnPropertyNames(this.$noseaPage)
+    ]
+
+    for (const n of pageNames) {
+      props[n] = {
+        configurable: true,
+        get: () => this.$noseaPage[n],
+        set: this.$noseaPage::(function (value) {
+          this[n] = value
+          return value
+        })
+      }
+    }
+
+    for (const n of thisNames) {
+      props[n] = {
+        configurable: true,
+        get: () => Reflect.get(this, n)
+      }
+    }
+
+    Object.defineProperties(target, props)
+    this.proxy = target
+  }
+}
+class NoseaPage {
+  static isNoseaPage = true
+
+  static data = {}
+  static methods = {}
+  static mixins = []
+
+  ;[S_MINA_APP] = getApp()
+  ;[S_NOSEA_APP] = null
+  ;[S_MINA_PAGE] = null
+  ;[S_LOAD_OPTIONS] = null
+
+  ;[S_PAGE_PROXIES] = []
+
+  ;lifecyclePromises = { ...noseaPageDefaultLifecyclePromises }
+  hooks = getNoseaPageHooks()
+
+  constructor (minaPage) {
+    this[S_MINA_PAGE] = minaPage
+    this.hooks.hookBeforeLoad((noseaPage, minaPage, wxRes) => {
+      Object.defineProperties(minaPage, {
         '$noseaPage': {
-          get () { return _this }
-        },
-        '$noseaApp': {
-          get () { return _this.$noseaApp }
-        },
-        '$minaApp': {
-          get () { return _this.$minaApp }
-        },
-        'isMinaPage': {
-          get () { return true }
+          get () { return noseaPage }
         }
       })
-      _this[minaPageSymbol] = this
 
-      return _this.$noseaApp.plugins.commitPageHook('onLoad', _this).then(() => {
-        return (_this['onLoad'] || noop).bind(this, options)()
-      })
-    }
+      this[S_NOSEA_APP] = wx.$app
+      this[S_MINA_PAGE] = minaPage
+      this[S_LOAD_OPTIONS] = wxRes
+    })
 
-    ret['onShow'] = function (options) {
-      const route = {
-        path: this.__route__,
-        noseaPage: _this,
-        minaPage: this
-      }
+    initPlugins(this)
 
-      Object.defineProperty(this.$noseaApp, '$route', {
-        configurable: true,
-        get () { return route }
-      })
-      Object.defineProperty(this.$noseaApp.$minaApp, '$route', {
-        configurable: true,
-        get () { return route }
-      })
-
-      return _this.$noseaApp.plugins.commitPageHook('onShow', _this).then(() => {
-        return (_this['onShow'] || noop).bind(this, options)()
-      })
-    }
-
-    ret['onShareAppMessage'] = function (options) {
-      return (
-        (_this['onShareAppMessage'] || noop).bind(_this, options)() ||
-        _this.$noseaApp.plugins.commitPageShareAppMessage(options, _this)
+    for (const m of this.constructor.mixins) {
+      this[S_PAGE_PROXIES].push(
+        new PageProxy(this, m)
       )
     }
 
-    MINA_PAGE_LIFECYCLES.forEach((key, i) => {
-      ret[key] = ret[key] || function (...args) {
-        return _this.$noseaApp.plugins.commitPageHook(key, _this).then(() => {
-          return (_this[key] || noop).bind(this, ...args)()
-        })
-      }
-    })
-
-    this[minaPageConstructSymbol] = ret
-    return this.minaPageStruct
+    Object.assign(this.$minaPage, this.minaPageMethods)
+    this.$minaPage.setData(this.minaPageData)
   }
 
-  static init () {
-    const page = new this()
-    return page.construct()
+  get minaPageMethods () {
+    return Object.assign(
+      {},
+      ...this[S_PAGE_PROXIES].map(i => i.getMinaPageMethods()))
+  }
+
+  get minaPageData () {
+    return Object.assign(
+      {},
+      ...this[S_PAGE_PROXIES].map(i => i.getMinaPageData())
+    )
+  }
+
+  get $minaApp () { return this[S_MINA_APP] }
+  get $noseaApp () { return this[S_NOSEA_APP] }
+  get $minaPage () { return this[S_MINA_PAGE] }
+
+  get loadOptions () { return this[S_LOAD_OPTIONS] }
+
+  get data () { return this.$minaPage.data }
+
+  static get builder () {
+    this.mixins.push({
+      methods: this.methods,
+      data: this.data
+    })
+    return {
+      $constructor: this,
+      ...getMinaPageLifecycles()
+    }
   }
 }
 
-export { NoseaPage }
+function useMixinDecorator (...mixins) {
+  return function (target) {
+    for (const mixin of mixins) {
+      target.mixins.push({
+        ...mixin[0],
+        name: mixin[1] || mixin[0].name
+      })
+    }
+  }
+}
+
+export default NoseaPage
+export { NoseaPage, useMixinDecorator }
