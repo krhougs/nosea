@@ -27,7 +27,7 @@ class PageProxy {
     this.initProxy()
 
     if (typeof mixin.onMount === 'function') {
-      this::mixin.onMount(noseaPage)
+      this.proxy::mixin.onMount(noseaPage)
     }
 
     initPlugins(this)

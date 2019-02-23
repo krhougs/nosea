@@ -1,6 +1,6 @@
 {
   "name": "@nosea/core",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "一个微信小程序框架。",
   "main": "./lib/index.js",
   "author": "Jiacheng ZHANG<os@kt.je>",
