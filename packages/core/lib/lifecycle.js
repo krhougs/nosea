@@ -46,7 +46,7 @@ function getMinaLifecycles (lifecycles, noseaContext, hookContexts) {
       const retPromise = (async () => {
         await context.hooks.callHook(`before${name}`, context, this, wxRes)
         await context.hooks.callHook(`on${name}`, context, this, wxRes)
-        const ret = await context::(context[`on${name}`] || noop)(wxRes)
+        const ret = await (context::(context[`on${name}`] || noop)(wxRes))
         context.hooks.callHook(`after${name}`, context, this, wxRes)
         return ret
       })()
@@ -62,7 +62,7 @@ function getMinaLifecycles (lifecycles, noseaContext, hookContexts) {
         context = new this.$constructor(this)
       }
       context.hooks.callHook(`on${name}`, context, this, wxRes)
-      return context::(context[`on${name}`] || noop)(context)(wxRes)
+      return context::(context[`on${name}`] || noop)(wxRes)
     }
   }
   if (lifecycles.share) {

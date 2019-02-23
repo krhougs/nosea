@@ -127,6 +127,11 @@ class PageProxy {
       }
     }
 
+    props['$pageProxy'] = {
+      configurable: true,
+      get: () => this
+    }
+
     Object.defineProperties(target, props)
     this.proxy = target
   }
