@@ -1,4 +1,4 @@
-import { autorun, toJS } from 'mobx'
+import { autorun, toJS, createAtom, when } from 'mobx'
 import { diff } from 'deep-object-diff'
 import { NoseaPluginBase } from '@nosea/core'
 
@@ -24,7 +24,6 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
   }
 
   installPage (page) {
-    // const app = page.$noseaApp
     const _this = this
 
     page.__mobxNames = []
@@ -34,7 +33,6 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
       page.__mobxNames.push(n)
     }
 
-    page.$minaPage.setData(page.__mobxData)
     page.hooks.hookBeforeLoad(() => {
       autorun(page::reactOnMobxValueChange, {
         delay: _this.delayOnPage
@@ -51,10 +49,9 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
 
 const debounced = debounce(function (reaction) {
   const toSet = {}
-
-  for (const name of this.__mobxNames) {
-    const newData = toJS(this[name])
-    const oldData = this.__mobxData[name]
+  for (const name in this.__mobxData) {
+    const newData = this.__mobxData[name]
+    const oldData = this.$minaPage.__viewData__
     if (
       typeof newData === typeof oldData &&
       typeof newData === 'object'
@@ -69,16 +66,21 @@ const debounced = debounce(function (reaction) {
         toSet[name] = newData
       }
     }
-    this.__mobxData[name] = newData
   }
 
   if (Object.getOwnPropertyNames(toSet).length) {
     this.$minaPage.setData(toSet)
   }
-}, 300)
+}, 240)
 
 function reactOnMobxValueChange (reaction) {
-  noop(this[this.__mobxNames[0]]) // tap to invoke
+  const mobx = this.$mobx || this.$noseaPage.$mobx
+  if (mobx) {
+    this.__mobxNames = Object.getOwnPropertyNames(mobx.values)
+  }
+  for (const name of this.__mobxNames) {
+    this.__mobxData[name] = toJS(this[name])
+  }
   this::debounced(reaction)
 }
 

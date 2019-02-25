@@ -1,6 +1,6 @@
 {
   "name": "@nosea/mobx",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "mobx binding for Nosea.",
   "main": "./lib/index.js",
   "author": "Jiacheng ZHANG<os@kt.je>",
