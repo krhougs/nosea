@@ -1,4 +1,4 @@
-import { autorun, toJS, createAtom, when } from 'mobx'
+import { autorun, toJS, extendObservable } from 'mobx'
 import { diff } from 'deep-object-diff'
 import { NoseaPluginBase } from '@nosea/core'
 
@@ -28,6 +28,18 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
 
     page.__mobxNames = []
     page.__mobxData = {}
+
+    extendObservable(page, {
+      get $data () {
+        const ret = {}
+        for (const name in page.$mobx.values) {
+          if (name !== '$data') {
+            ret[name] = toJS(page[name])
+          }
+        }
+        return ret
+      }
+    })
 
     for (const n in page.__mobxDecorators) {
       page.__mobxNames.push(n)
@@ -75,12 +87,8 @@ const debounced = debounce(function (reaction) {
 
 function reactOnMobxValueChange (reaction) {
   const mobx = this.$mobx || this.$noseaPage.$mobx
-  if (mobx) {
-    this.__mobxNames = Object.getOwnPropertyNames(mobx.values)
-  }
-  for (const name of this.__mobxNames) {
-    this.__mobxData[name] = toJS(this[name])
-  }
+  this.__mobxData = this.$data
+
   this::debounced(reaction)
 }
 
