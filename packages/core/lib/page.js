@@ -73,6 +73,9 @@ class PageProxy {
   }
 
   getMinaPageData () {
+    if (!this.mData) {
+      return {}
+    }
     return this.name
       ? { [this.name]: this.mData }
       : this.mData
@@ -166,6 +169,12 @@ class NoseaPage {
       this[S_MINA_PAGE] = minaPage
       this[S_LOAD_OPTIONS] = wxRes
     })
+
+    for (const m of this.constructor.mixins) {
+      if (typeof m.beforeMount === 'function') {
+        this::m.beforeMount(this)
+      }
+    }
 
     initPlugins(this)
 

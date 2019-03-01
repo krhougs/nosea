@@ -12,21 +12,19 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
     super()
     this.options = Object.assign({
       delayOnPage: 0,
-      delayOnPageProxy: 0,
+      setDataDelay: 320,
       autorunOptions: {}
     }, options)
   }
 
   installApp (app) {
     throwIfInitilized(this, app)
-
     markAppAsInitilized(this, app)
   }
 
   installPage (page) {
     const _this = this
 
-    page.__mobxNames = []
     page.__mobxData = {}
 
     extendObservable(page, {
@@ -41,55 +39,48 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
       }
     })
 
-    for (const n in page.__mobxDecorators) {
-      page.__mobxNames.push(n)
+    const handler = createDebouncedHandler(page, this.options.setDataDelay)
+
+    function reactOnMobxValueChange (reaction) {
+      this.__mobxData = toJS(page.$data)
+      handler(reaction)
     }
 
-    page.hooks.hookBeforeLoad(() => {
-      autorun(page::reactOnMobxValueChange, {
-        delay: _this.delayOnPage
-      })
+    const disposer = autorun(page::reactOnMobxValueChange, {
+      delay: _this.delayOnPage
     })
-  }
 
-  installPageProxy (proxy) {
-    autorun(proxy.proxy::reactOnMobxValueChange, {
-      delay: this.delayOnPageProxy
-    })
+    page.hooks.hookOnUnload(() => disposer())
   }
 }
 
-const debounced = debounce(function (reaction) {
-  const toSet = {}
-  for (const name in this.__mobxData) {
-    const newData = this.__mobxData[name]
-    const oldData = this.$minaPage.__viewData__
-    if (
-      typeof newData === typeof oldData &&
-      typeof newData === 'object'
-    ) {
-      if (!oldData || Object.getOwnPropertyNames(
-        diff(oldData, newData)
-      ).length) {
-        toSet[name] = newData
-      }
-    } else {
-      if (newData !== oldData) {
-        toSet[name] = newData
+function createDebouncedHandler (context, delay) {
+  const ret = debounce(function (reaction) {
+    const toSet = {}
+
+    for (const name in this.__mobxData) {
+      const newData = this.__mobxData[name]
+      const oldData = this.$minaPage.data[name]
+      if (
+        typeof newData === typeof oldData &&
+        typeof newData === 'object'
+      ) {
+        if (!oldData || Object.getOwnPropertyNames(
+          diff(oldData, newData)
+        ).length) {
+          toSet[name] = newData
+        }
+      } else {
+        if (newData !== oldData) {
+          toSet[name] = newData
+        }
       }
     }
-  }
-
-  if (Object.getOwnPropertyNames(toSet).length) {
-    this.$minaPage.setData(toSet)
-  }
-}, 240)
-
-function reactOnMobxValueChange (reaction) {
-  const mobx = this.$mobx || this.$noseaPage.$mobx
-  this.__mobxData = this.$data
-
-  this::debounced(reaction)
+    if (Object.getOwnPropertyNames(toSet).length) {
+      this.$minaPage.setData(toSet)
+    }
+  }, delay)
+  return context::ret
 }
 
 function markAppAsInitilized (store, app) {
