@@ -2,9 +2,9 @@
 # yarn lockfile v1
 
 
-"@nosea/core@^1.0.2":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@nosea/core/-/core-1.0.2.tgz#56234c98f9d2be308aff6268461481f13c5e4272"
+"@nosea/core@^1.0.7":
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@nosea/core/-/core-1.0.7.tgz#430c4674493159b905a657c73a10a9a74302d695"
   dependencies:
     hable "^0.0.7"
 

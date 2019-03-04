@@ -1,6 +1,6 @@
 {
   "name": "@nosea/mobx",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "mobx binding for Nosea.",
   "main": "./lib/index.js",
   "author": "Jiacheng ZHANG<os@kt.je>",
@@ -8,7 +8,7 @@
   "repository": "oranzhang/nosea",
   "license": "MIT",
   "dependencies": {
-    "@nosea/core": "^1.0.2",
+    "@nosea/core": "^1.0.7",
     "deep-object-diff": "^1.1.0",
     "lodash": "^4.17.11",
     "mobx": "4"

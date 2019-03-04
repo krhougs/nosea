@@ -24,7 +24,8 @@ export const MINA_APP_LIFECYCLES = {
 }
 
 export const MINA_PAGE_LIFECYCLES = {
-  async: ['Load', 'Show', 'Ready'],
+  load: 'Load',
+  async: ['Show', 'Ready'],
   sync: [
     'Hide', 'Unload',
     'PullDownRefresh', 'ReachBottom',

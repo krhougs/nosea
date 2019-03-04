@@ -25,62 +25,42 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
   installPage (page) {
     const _this = this
 
-    page.__mobxData = {}
+    extendObservable(page, {}) // trigger mobx create page.$mobx accessor
 
-    extendObservable(page, {
-      get $data () {
-        const ret = {}
-        for (const name in page.$mobx.values) {
-          if (name !== '$data') {
-            ret[name] = toJS(page[name])
+    const handlers = Object.getOwnPropertyNames(page.$mobx.values)
+      .map(name => {
+        const handler = function (reaction) {
+          let toSet
+          const newData = toJS(this[name])
+          const oldData = this.$minaPage.data[name]
+          console.log(name, oldData, newData)
+          if (
+            typeof newData === typeof oldData &&
+            typeof newData === 'object'
+          ) {
+            if (!oldData || (!!newData && !!Object.getOwnPropertyNames(diff(oldData, newData)).length)) {
+              toSet = newData
+            }
+          } else {
+            if (newData !== oldData) {
+              toSet = newData
+            }
+          }
+          if (typeof toSet !== 'undefined') {
+            this.$minaPage.setData({ [name]: toSet })
           }
         }
-        return ret
-      }
+        return page::handler
+      })
+
+    const disposers = []
+    page.hooks.hookAfterLoad(() => {
+      handlers.forEach(h => {
+        disposers.push(autorun(h))
+      })
     })
-
-    const handler = createDebouncedHandler(page, this.options.setDataDelay)
-
-    function reactOnMobxValueChange (reaction) {
-      this.__mobxData = toJS(page.$data)
-      handler(reaction)
-    }
-
-    const disposer = autorun(page::reactOnMobxValueChange, {
-      delay: _this.delayOnPage
-    })
-
-    page.hooks.hookOnUnload(() => disposer())
+    page.hooks.hookOnUnload(() => disposers.forEach(i => i()))
   }
-}
-
-function createDebouncedHandler (context, delay) {
-  const ret = debounce(function (reaction) {
-    const toSet = {}
-
-    for (const name in this.__mobxData) {
-      const newData = this.__mobxData[name]
-      const oldData = this.$minaPage.data[name]
-      if (
-        typeof newData === typeof oldData &&
-        typeof newData === 'object'
-      ) {
-        if (!oldData || Object.getOwnPropertyNames(
-          diff(oldData, newData)
-        ).length) {
-          toSet[name] = newData
-        }
-      } else {
-        if (newData !== oldData) {
-          toSet[name] = newData
-        }
-      }
-    }
-    if (Object.getOwnPropertyNames(toSet).length) {
-      this.$minaPage.setData(toSet)
-    }
-  }, delay)
-  return context::ret
 }
 
 function markAppAsInitilized (store, app) {

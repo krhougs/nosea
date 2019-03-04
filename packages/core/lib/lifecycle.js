@@ -13,6 +13,8 @@ import {
 function getHooks (lifecycles) {
   class ContextHooks extends Hookable {
     static hookNames = [
+      ...(i => ['on', 'before', 'after']
+        .map(ii => ii + i))(lifecycles.load),
       ...flat(
         lifecycles.async
           .map(i => ['on', 'before', 'after']
@@ -36,30 +38,56 @@ function getHooks (lifecycles) {
 
 function getMinaLifecycles (lifecycles, noseaContext, hookContexts) {
   const lifecycleCallbacks = {}
+  let pageInitPromise
+
+  if (!noseaContext) {
+    pageInitPromise = new Promise(function (resolve, reject) {
+      const name = lifecycles.load
+      const lcName = `on${name}`
+      lifecycleCallbacks[lcName] = function (wxRes) {
+        const context = new this.$constructor(this)
+        resolve(context)
+        const retPromise = (async () => {
+          if (!context) {
+            context = await pageInitPromise
+          }
+          await context.hooks.callHook(`before${name}`, context, this, wxRes)
+          await context.hooks.callHook(`on${name}`, context, this, wxRes)
+          const ret = await (context::(context[`on${name}`] || noop)(wxRes))
+          context.hooks.callHook(`after${name}`, context, this, wxRes)
+          return ret
+        })()
+        context.lifecyclePromises[lcName] = retPromise
+        return retPromise
+      }
+    })
+  }
+
   for (const name of lifecycles.async) {
     const lcName = `on${name}`
     lifecycleCallbacks[lcName] = function (wxRes) {
-      let context = noseaContext || this.$noseaPage
-      if (!context) {
-        context = new this.$constructor(this)
-      }
+      let context = noseaContext
+
       const retPromise = (async () => {
+        if (!context) {
+          context = await pageInitPromise
+        }
         await context.hooks.callHook(`before${name}`, context, this, wxRes)
         await context.hooks.callHook(`on${name}`, context, this, wxRes)
         const ret = await (context::(context[`on${name}`] || noop)(wxRes))
         context.hooks.callHook(`after${name}`, context, this, wxRes)
+        context.lifecyclePromises[lcName] = retPromise
         return ret
       })()
-      context.lifecyclePromises[lcName] = retPromise
       return retPromise
     }
   }
   for (const name of lifecycles.sync) {
     const lcName = `on${name}`
-    lifecycleCallbacks[lcName] = function (wxRes) {
+    lifecycleCallbacks[lcName] = async function (wxRes) {
       let context = noseaContext || this.$noseaPage
       if (!context) {
-        context = new this.$constructor(this)
+        context = await pageInitPromise
       }
       context.hooks.callHook(`on${name}`, context, this, wxRes)
       return context::(context[`on${name}`] || noop)(wxRes)
@@ -69,9 +97,6 @@ function getMinaLifecycles (lifecycles, noseaContext, hookContexts) {
     const lcName = `on${lifecycles.share}`
     lifecycleCallbacks[lcName] = function (wxRes) {
       let context = noseaContext || this.$noseaPage
-      if (!context) {
-        context = new this.$constructor(this)
-      }
       return context::(context[lcName])(wxRes)
     }
   }
