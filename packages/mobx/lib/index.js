@@ -33,7 +33,6 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
           let toSet
           const newData = toJS(this[name])
           const oldData = this.$minaPage.data[name]
-          console.log(name, oldData, newData)
           if (
             typeof newData === typeof oldData &&
             typeof newData === 'object'
