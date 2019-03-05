@@ -1,5 +1,5 @@
 function toJS (obj) {
-  if (typeof obj !== 'object') {
+  if (typeof obj !== 'object' || !obj) {
     return obj
   }
   if (obj.map) {
