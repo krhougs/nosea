@@ -1,8 +1,8 @@
-import { autorun, toJS, extendObservable } from 'mobx'
+import { autorun, extendObservable } from 'mobx'
 import { diff } from 'deep-object-diff'
 import { NoseaPluginBase } from '@nosea/core'
 
-import debounce from './debounce'
+import { toJS } from './utils'
 
 const S_INITILIZED = Symbol('storeInitilized')
 const E_INITILIZED = new Error('NoseaMobxBindPlugin is already initilized.')
@@ -52,11 +52,8 @@ class NoseaMobxBindPlugin extends NoseaPluginBase {
         return page::handler
       })
 
-    const disposers = []
-    page.hooks.hookAfterLoad(() => {
-      handlers.forEach(h => {
-        disposers.push(autorun(h))
-      })
+    const disposers = handlers.map(h => autorun(h), {
+      delay: this.options.setDataDelay
     })
     page.hooks.hookOnUnload(() => disposers.forEach(i => i()))
   }
